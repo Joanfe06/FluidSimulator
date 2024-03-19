@@ -1,18 +1,17 @@
 #include "particles.h"
 #include <stdio.h>
-#define _USE_MATH_DEFINES
+#include <stdlib.h>
 #include <math.h>
 
-// Function to initialize particles
+#define _USE_MATH_DEFINES
+
 void init_particles(Particles* particles, int num_particles, double max_x, double max_y, double forces[2], double radius, double collision_loss, double influence_radius) {
-    // Allocate memory for particles
-    particles->particles = (Particle*)malloc(num_particles * sizeof(Particle));
+    particles->particles = malloc(num_particles * sizeof(Particle));
     if (particles->particles == NULL) {
-        fprintf(stderr, "Memory allocation failed for particles.\n");
-        exit(EXIT_FAILURE); // Or handle the error appropriately
+        perror("Memory allocation failed for particles.");
+        exit(EXIT_FAILURE);
     }
     
-    // Initialize particle properties
     particles->index = 0;
     particles->num_particles = num_particles;
     particles->max_x = max_x;
@@ -20,121 +19,122 @@ void init_particles(Particles* particles, int num_particles, double max_x, doubl
     particles->forces[0] = forces[0];
     particles->forces[1] = forces[1];
     particles->radius = radius;
+    particles->influence_radius = influence_radius;
     particles->collision_loss = collision_loss;
 
-    // Initialize each particle
-    for (int i = 0; i < num_particles; ++i) {
-        particles->particles[i].index = i;
-        particles->particles[i].position[0] = (double)rand() / RAND_MAX * max_x;
-        particles->particles[i].position[1] = (double)rand() / RAND_MAX * max_y;
-        particles->particles[i].velocity[0] = 0;
-        particles->particles[i].velocity[1] = 0;
-        particles->particles[i].acceleration[0] = 0;
-        particles->particles[i].acceleration[1] = 0;
-        particles->particles[i].forces[0] = forces[0];
-        particles->particles[i].forces[1] = forces[1];
-        particles->particles[i].radius = radius;
-        particles->particles[i].influence_radius = influence_radius;
-        particles->particles[i].max_x = max_x;
-        particles->particles[i].max_y = max_y;
-        particles->particles[i].collision_loss = collision_loss;
-        particles->particles[i].particles = particles; // Set pointer to parent Particles structure
+    for (int i = 0; i < num_particles; i++) {
+        Particle* p = &particles->particles[i];
+        p->index = i;
+        p->position[0] = (double)rand() / RAND_MAX * max_x;
+        p->position[1] = (double)rand() / RAND_MAX * max_y;
+        p->velocity[0] = p->velocity[1] = 0;
+        p->acceleration[0] = p->acceleration[1] = 0;
+        p->density = 0;
     }
 }
 
-// Function to add a particle
-void add_particle(Particles* particles, double max_x, double max_y, double forces[2], double radius, double collision_loss, double influence_radius) {
-    // Reallocate memory for particles to add one more
-    Particle* new_particles = (Particle*)realloc(particles->particles, (particles->num_particles + 1) * sizeof(Particle));
+void add_particle(Particles* particles, double max_x, double max_y) {
+    Particle* new_particles = realloc(particles->particles, (particles->num_particles + 1) * sizeof(Particle));
     if (new_particles == NULL) {
-        fprintf(stderr, "Memory reallocation failed for adding a particle.\n");
-        // Optionally handle the error or exit the program
+        perror("Memory reallocation failed for adding a particle.");
         return;
     }
     
-    // Update particles pointer to the new memory block
     particles->particles = new_particles;
     
-    // Initialize the new particle
-    particles->particles[particles->index].index = particles->index;
-    particles->particles[particles->index].position[0] = (double)rand() / RAND_MAX * max_x;
-    particles->particles[particles->index].position[1] = (double)rand() / RAND_MAX * max_y;
-    particles->particles[particles->index].velocity[0] = 0;
-    particles->particles[particles->index].velocity[1] = 0;
-    particles->particles[particles->index].acceleration[0] = 0;
-    particles->particles[particles->index].acceleration[1] = 0;
-    particles->particles[particles->index].forces[0] = forces[0];
-    particles->particles[particles->index].forces[1] = forces[1];
-    particles->particles[particles->index].radius = radius;
-    particles->particles[particles->index].max_x = max_x;
-    particles->particles[particles->index].max_y = max_y;
-    particles->particles[particles->index].collision_loss = collision_loss;
-    particles->particles[particles->index].influence_radius = influence_radius;
-    particles->particles[particles->index].particles = particles; // Set pointer to parent Particles structure
+    Particle* p = &particles->particles[particles->index];
+    p->index = particles->index;
+    p->position[0] = (double)rand() / RAND_MAX * max_x;
+    p->position[1] = (double)rand() / RAND_MAX * max_y;
+    p->velocity[0] = p->velocity[1] = 0;
+    p->acceleration[0] = p->acceleration[1] = 0;
+    p->density = 0;
     
-    // Update particle count
     particles->index++;
     particles->num_particles++;
 }
 
-// Function to update particles
 void update_particles(Particles* particles, double dt) {
-    for (int i = 0; i < particles->num_particles; ++i) {
-        // Update position based on velocity
-        particles->particles[i].position[0] += particles->particles[i].velocity[0] * dt;
-        particles->particles[i].position[1] += particles->particles[i].velocity[1] * dt;
-        
-        // Apply external forces as acceleration
-        particles->particles[i].acceleration[0] = particles->particles[i].forces[0];
-        particles->particles[i].acceleration[1] = particles->particles[i].forces[1];
+    for (int i = 0; i < particles->num_particles; i++) {
+        Particle* p = &particles->particles[i];
+        p->velocity[0] += particles->forces[0] * dt;
+        p->velocity[1] += particles->forces[1] * dt;
 
-        // Handle wall collisions and apply collision loss
-        if (particles->particles[i].position[0] <= particles->particles[i].radius) {
-            particles->particles[i].position[0] = particles->particles[i].radius;
-            particles->particles[i].velocity[0] *= -particles->particles[i].collision_loss; // Apply collision loss
-        }
-        if (particles->particles[i].position[0] >= particles->particles[i].max_x - particles->particles[i].radius) {
-            particles->particles[i].position[0] = particles->particles[i].max_x - particles->particles[i].radius;
-            particles->particles[i].velocity[0] *= -particles->particles[i].collision_loss; // Apply collision loss
-        }
-        if (particles->particles[i].position[1] <= particles->particles[i].radius) {
-            particles->particles[i].position[1] = particles->particles[i].radius;
-            particles->particles[i].velocity[1] *= -particles->particles[i].collision_loss; // Apply collision loss
-        }
-        if (particles->particles[i].position[1] >= particles->particles[i].max_y - particles->particles[i].radius) {
-            particles->particles[i].position[1] = particles->particles[i].max_y - particles->particles[i].radius;
-            particles->particles[i].velocity[1] *= -particles->particles[i].collision_loss; // Apply collision loss
-        }
+        p->density = calculate_density(particles, p->position);
 
-        // Apply acceleration to velocity
-        particles->particles[i].velocity[0] += particles->particles[i].acceleration[0] * dt;
-        particles->particles[i].velocity[1] += particles->particles[i].acceleration[1] * dt;
+        double pressure_force[2];
+        calculate_pressure_force(particles, i, pressure_force);
+        p->acceleration[0] = pressure_force[0] / p->density;
+        p->acceleration[1] = pressure_force[1] / p->density;
 
-        // Zero out very small velocities to avoid numerical errors
-        if (fabs(particles->particles[i].velocity[0]) < 1)
-            particles->particles[i].velocity[0] = 0;
-        if (fabs(particles->particles[i].velocity[1]) < 1)
-            particles->particles[i].velocity[1] = 0;
+        p->velocity[0] += p->acceleration[0] * dt;
+        p->velocity[1] += p->acceleration[1] * dt;
+
+        p->position[0] += p->velocity[0] * dt;
+        p->position[1] += p->velocity[1] * dt;
+
+        handle_wall_collisions(particles, p);
+        zero_out_small_velocities(p);
     }
 }
 
-// Function to calculate density
 double calculate_density(Particles* particles, double p[2]) {
     double mass = 1;
     double density = 0;
 
-    for (int i = 0; i < particles->num_particles; ++i) {
-        double dist = sqrt(pow(particles->particles[i].position[0] - p[0], 2) + pow(particles->particles[i].position[1] - p[1], 2));
-        double influence = smoothing_kernel(particles->particles[i].influence_radius, dist);
+    for (int i = 0; i < particles->num_particles; i++) {
+        Particle* current = &particles->particles[i];
+        double dist = hypot(current->position[0] - p[0], current->position[1] - p[1]);
+        double influence = smoothing_kernel(particles->influence_radius, dist);
         density += mass * influence;
     }
 
     return density;
 }
 
-double smoothing_kernel(double r, double dst) {
-    double volume = M_PI * pow(r, 8) / 4;
-    double v = fmax(0, pow(r,2) - pow(dst,2));
-    return pow(v,3) / volume;
+void calculate_pressure_force(Particles* particles, int idx, double pressure_force[2]) {
+    pressure_force[0] = pressure_force[1] = 0;
+    double mass = 1;
+    double p[2] = {particles->particles[idx].position[0], particles->particles[idx].position[1]};
+
+    for (int i = 0; i < particles->num_particles; ++i) {
+        if(i == idx) continue;
+        Particle* current = &particles->particles[i];
+        double dst = hypot(current->position[0] - p[0], current->position[1] - p[1]);
+        if (dst == 0) continue;
+        double dir[2] = {(current->position[0] - p[0]) / dst, (current->position[1] - p[1]) / dst};
+        double slope = smoothing_kernel_gradient(dst, particles->influence_radius);
+        double density = current->density;
+        if (density == 0) continue;
+        double shared_pressure = calculate_shared_pressure(current->density, particles->particles[idx].density);
+
+        pressure_force[0] += -dir[0] * slope * shared_pressure * mass / density;
+        pressure_force[1] += -dir[1] * slope * shared_pressure * mass / density;
+    }
 }
 
+void handle_wall_collisions(Particles* particles, Particle* p) {
+    if (p->position[0] <= particles->radius) {
+        p->position[0] = particles->radius;
+        p->velocity[0] *= -particles->collision_loss;
+    }
+    if (p->position[0] >= particles->max_x - particles->radius) {
+        p->position[0] = particles->max_x - particles->radius;
+        p->velocity[0] *= -particles->collision_loss;
+    }
+    if (p->position[1] <= particles->radius) {
+        p->position[1] = particles->radius;
+        p->velocity[1] *= -particles->collision_loss;
+    }
+    if (p->position[1] >= particles->max_y - particles->radius) {
+        p->position[1] = particles->max_y - particles->radius;
+        p->velocity[1] *= -particles->collision_loss;
+    }
+}
+
+void zero_out_small_velocities(Particle* p) {
+    if (fabs(p->velocity[0]) < 1)
+        p->velocity[0] = 0;
+    if (fabs(p->velocity[1]) < 1)
+        p->velocity[1] = 0;
+}

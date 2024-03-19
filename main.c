@@ -2,22 +2,14 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
+#include <float.h>
 #include <SDL2/SDL.h>
 #include "particles.h"
 #include "particles.c"
-
-#define WIN_WIDTH 2000
-#define WIN_HEIGHT 1300
-#define BALL_RADIUS 5
-#define COLLISION_LOSS 0.7
-#define GRAVITY_X 0
-#define GRAVITY_Y 1
-#define BALL_ACCELERATION 1
-#define BALL_SPEED 1
-#define INFLUENCE_RADIUS 200
+#include "aux_functions.c"
 
 // Function to handle events
-void handle_events(Particles* particles, bool* running, bool* pause) {
+void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_density, bool* draw_pressure, double** densities, double** pressures, SDL_Renderer* renderer) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -27,10 +19,34 @@ void handle_events(Particles* particles, bool* running, bool* pause) {
         case SDL_KEYDOWN:
             switch (event.key.keysym.sym) {
             case SDLK_r:
-                init_particles(particles, 2, WIN_WIDTH, WIN_HEIGHT, (double[]) { GRAVITY_X, GRAVITY_Y }, BALL_RADIUS, COLLISION_LOSS, INFLUENCE_RADIUS);
+                init_particles(particles, NUM_PARTICLES, WIN_WIDTH, WIN_HEIGHT, (double[]) { GRAVITY_X, GRAVITY_Y }, BALL_RADIUS, COLLISION_LOSS, INFLUENCE_RADIUS);
                 break;
             case SDLK_SPACE:
                 *pause = !(*pause);
+                break;
+            case SDLK_d:
+                if ((*pause)) {
+                    if(*draw_density == true) {
+                        *draw_density = false;
+                    }
+                    else {
+                        *draw_density = true;
+                        double max_density = calculate_all_densities(particles, densities);
+                        draw_densities(renderer, densities, max_density);
+                    }
+                }
+                break;
+            case SDLK_p:
+                if ((*pause)) {
+                    if(*draw_pressure == true) {
+                        *draw_pressure = false;
+                    }
+                    else {
+                        *draw_pressure = true;
+                        double max_pressure = calculate_all_pressures(particles, pressures);
+                        draw_densities(renderer, pressures, max_pressure);
+                    }
+                }
                 break;
             default:
                 break;
@@ -41,6 +57,7 @@ void handle_events(Particles* particles, bool* running, bool* pause) {
         }
     }
 }
+
 
 int main() {
     // Initialize SDL
@@ -68,53 +85,33 @@ int main() {
 
     // Initialize particles
     Particles particles;
-    init_particles(&particles, 500, WIN_WIDTH, WIN_HEIGHT, (double[]) { GRAVITY_X, GRAVITY_Y }, BALL_RADIUS, COLLISION_LOSS, INFLUENCE_RADIUS);
+    init_particles(&particles, NUM_PARTICLES, WIN_WIDTH, WIN_HEIGHT, (double[]) { GRAVITY_X, GRAVITY_Y }, BALL_RADIUS, COLLISION_LOSS, INFLUENCE_RADIUS);
 
-    // Find maximum density
-    double max_density = 0;
-    double min_density = 100;
     
     // create a 2D array to store densities with allocated memory
     double** densities = (double**)malloc(WIN_WIDTH * sizeof(double*));
+    double** pressures = (double**)malloc(WIN_WIDTH * sizeof(double*));
     for (int i = 0; i < WIN_WIDTH; ++i) {
         densities[i] = (double*)malloc(WIN_HEIGHT * sizeof(double));
+        pressures[i] = (double*)malloc(WIN_HEIGHT * sizeof(double));
     }
-    
-    for (int x = 0; x < WIN_WIDTH; ++x) {
-        printf("x: %d\n", x);
-            for (int y = 0; y < WIN_HEIGHT; ++y) {
-                double p[2] = {x, y};
-                double density = calculate_density(&particles, p);
-                densities[x][y] = density;
-                if (density > max_density) {
-                    max_density = density;
-                }
-            }
-        }
-
-        printf("max_density: %f\n", max_density);
-        printf("min_density: %f\n", min_density);
 
 
     // Game loop control
     bool running = true;
     bool pause = true;
+    bool draw_density = false;
+    bool draw_pressure = false;
 
     // Main game loop
     while (running) {
         // Handle events
-        handle_events(&particles, &running, &pause);
+        handle_events(&particles, &running, &pause, &draw_density, &draw_pressure, densities, pressures, renderer);
 
         // Fill the background color
-        SDL_SetRenderDrawColor(renderer, 38, 44, 77, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(renderer);
-        
-        for (int x = 0; x < WIN_WIDTH; ++x) {
-            for (int y = 0; y < WIN_HEIGHT; ++y) {
-                int color = (int)(255 * densities[x][y] / max_density);
-                SDL_SetRenderDrawColor(renderer, color, color, color, SDL_ALPHA_OPAQUE);
-                SDL_RenderDrawPoint(renderer, x, y);
-            }
+        if(!draw_density && !draw_pressure) {
+            SDL_SetRenderDrawColor(renderer, 38, 44, 77, SDL_ALPHA_OPAQUE);
+            SDL_RenderClear(renderer);
         }
 
         // Draw particles
