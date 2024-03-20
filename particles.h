@@ -1,6 +1,6 @@
 #pragma once
 
-#ifndef PARTICLES_H
+#ifndef PARTICLES_
 #define PARTICLES_H
 
 #include <stdlib.h>
@@ -15,8 +15,8 @@
 #define BALL_ACCELERATION 1
 #define BALL_SPEED 1
 #define INFLUENCE_RADIUS 100
-#define TARGET_DENSITY 0.00100
-#define P_MULT 60
+#define TARGET_DENSITY 0.003
+#define P_MULT 1
 #define NUM_PARTICLES 250
 
 // Structure definitions
@@ -56,5 +56,6 @@ void calculate_pressure_force(Particles* particles, int idx, double pressure_for
 double calculate_shared_pressure(double d_a, double d_b);
 void handle_wall_collisions(Particles* particles, Particle* p);
 void zero_out_small_velocities(Particle* p);
+void getRandomDir(double dir[2]);
 
 #endif /* PARTICLES_H */

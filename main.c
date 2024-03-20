@@ -52,6 +52,16 @@ void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_
                 break;
             }
             break;
+        case SDL_MOUSEBUTTONDOWN:
+            if (event.button.button == SDL_BUTTON_LEFT) {
+                int x,y;
+                SDL_GetMouseState(&x, &y);
+                double p[2];
+                p[0] = x / 1.0;
+                p[1] = y / 1.0;
+                printf("Density at (%f, %f): %lf\n", p[0], p[1], calculate_density(particles, p));
+                }
+            break;
         default:
             break;
         }

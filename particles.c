@@ -55,12 +55,14 @@ void add_particle(Particles* particles, double max_x, double max_y) {
 }
 
 void update_particles(Particles* particles, double dt) {
+    for (int i = 0; i < particles->num_particles; i++){
+        Particle* p = &particles->particles[i];
+        p->density = calculate_density(particles, p->position);
+    }
     for (int i = 0; i < particles->num_particles; i++) {
         Particle* p = &particles->particles[i];
         p->velocity[0] += particles->forces[0] * dt;
         p->velocity[1] += particles->forces[1] * dt;
-
-        p->density = calculate_density(particles, p->position);
 
         double pressure_force[2];
         calculate_pressure_force(particles, i, pressure_force);
@@ -74,7 +76,6 @@ void update_particles(Particles* particles, double dt) {
         p->position[1] += p->velocity[1] * dt;
 
         handle_wall_collisions(particles, p);
-        zero_out_small_velocities(p);
     }
 }
 
@@ -96,16 +97,22 @@ void calculate_pressure_force(Particles* particles, int idx, double pressure_for
     pressure_force[0] = pressure_force[1] = 0;
     double mass = 1;
     double p[2] = {particles->particles[idx].position[0], particles->particles[idx].position[1]};
+    double dir[2];
 
     for (int i = 0; i < particles->num_particles; ++i) {
         if(i == idx) continue;
         Particle* current = &particles->particles[i];
-        double dst = hypot(current->position[0] - p[0], current->position[1] - p[1]);
-        if (dst == 0) continue;
-        double dir[2] = {(current->position[0] - p[0]) / dst, (current->position[1] - p[1]) / dst};
+
+        double offset[2] = {current->position[0] - p[0], current->position[1] - p[1]};
+        double dst = hypot(offset[0], offset[1]);
+        if (dst == 0){
+            getRandomDir(dir);
+        } else {
+            dir[0] = offset[0] / dst;
+            dir[1] = offset[1] / dst;
+        }
         double slope = smoothing_kernel_gradient(dst, particles->influence_radius);
         double density = current->density;
-        if (density == 0) continue;
         double shared_pressure = calculate_shared_pressure(current->density, particles->particles[idx].density);
 
         pressure_force[0] += -dir[0] * slope * shared_pressure * mass / density;
@@ -132,9 +139,7 @@ void handle_wall_collisions(Particles* particles, Particle* p) {
     }
 }
 
-void zero_out_small_velocities(Particle* p) {
-    if (fabs(p->velocity[0]) < 1)
-        p->velocity[0] = 0;
-    if (fabs(p->velocity[1]) < 1)
-        p->velocity[1] = 0;
+void getRandomDir(double dir[2]) {
+    dir[0] = (double)rand() / RAND_MAX;
+    dir[1] = 1.0 - dir[0];
 }

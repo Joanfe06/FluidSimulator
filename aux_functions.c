@@ -41,6 +41,7 @@ double calculate_all_densities(Particles* particles, double** densities) {
     double mean_density = total_density / (WIN_WIDTH * WIN_HEIGHT);
     printf("Mean Density: %lf\n", mean_density);
     printf("Max Density: %lf\n", max_density);
+    printf("Total Density: %lf\n", total_density);
     return max_density;
 }
 
