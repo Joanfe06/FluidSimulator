@@ -8,8 +8,11 @@
 #include "particles.c"
 #include "aux_functions.c"
 
+bool x = false;
+int frames = 0;
+
 // Function to handle events
-void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_density, bool* draw_pressure, double** densities, double** pressures, SDL_Renderer* renderer) {
+void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_density, bool* draw_pressure, bool* draw_radius, double** densities, double** pressures, SDL_Renderer* renderer) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -23,6 +26,7 @@ void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_
                 break;
             case SDLK_SPACE:
                 *pause = !(*pause);
+                frames = 0;
                 break;
             case SDLK_d:
                 if ((*pause)) {
@@ -43,8 +47,11 @@ void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_
                     }
                     else {
                         *draw_pressure = true;
-                        double max_pressure = calculate_all_pressures(particles, pressures);
-                        draw_densities(renderer, pressures, max_pressure);
+                        double minmax[2];
+                        calculate_all_pressures(particles, pressures, minmax);
+                        printf("Min Pressure: %lf\n", minmax[0]);
+                        printf("Max Pressure: %lf\n", minmax[1]);
+                        draw_pressures(renderer, pressures, minmax);
                     }
                 }
                 break;
@@ -60,6 +67,22 @@ void handle_events(Particles* particles, bool* running, bool* pause, bool* draw_
                 p[0] = x / 1.0;
                 p[1] = y / 1.0;
                 printf("Density at (%f, %f): %lf\n", p[0], p[1], calculate_density(particles, p));
+                }
+            if (event.button.button == SDL_BUTTON_RIGHT) {
+                int x,y;
+                SDL_GetMouseState(&x, &y);
+                double p[2];
+                p[0] = x / 1.0;
+                p[1] = y / 1.0;
+                if(*draw_radius == true) {
+                        *draw_radius = false;
+                        x = true;
+                    }
+                    else if (x){
+                        *draw_radius = true;
+                        x = false;
+                        paint_each_point_within_radius(renderer, particles, p);
+                    }
                 }
             break;
         default:
@@ -93,6 +116,8 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    
+
     // Initialize particles
     Particles particles;
     init_particles(&particles, NUM_PARTICLES, WIN_WIDTH, WIN_HEIGHT, (double[]) { GRAVITY_X, GRAVITY_Y }, BALL_RADIUS, COLLISION_LOSS, INFLUENCE_RADIUS);
@@ -106,44 +131,59 @@ int main() {
         pressures[i] = (double*)malloc(WIN_HEIGHT * sizeof(double));
     }
 
+    double frame_start_time = SDL_GetTicks();
+
 
     // Game loop control
     bool running = true;
     bool pause = true;
     bool draw_density = false;
     bool draw_pressure = false;
+    bool draw_radius = false;
 
     // Main game loop
     while (running) {
         // Handle events
-        handle_events(&particles, &running, &pause, &draw_density, &draw_pressure, densities, pressures, renderer);
+        handle_events(&particles, &running, &pause, &draw_density, &draw_pressure, &draw_radius, densities, pressures, renderer);
 
         // Fill the background color
-        if(!draw_density && !draw_pressure) {
+        if(!draw_density && !draw_pressure && !draw_radius) {
             SDL_SetRenderDrawColor(renderer, 38, 44, 77, SDL_ALPHA_OPAQUE);
             SDL_RenderClear(renderer);
         }
 
         // Draw particles
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-        for (int i = 0; i < particles.num_particles; ++i) {
-            int centerX = (int)particles.particles[i].position[0];
-            int centerY = (int)particles.particles[i].position[1];
-            int radius = BALL_RADIUS;
+        if(!draw_radius){
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+            for (int i = 0; i < particles.num_particles; ++i) {
+                int centerX = (int)particles.particles[i].position[0];
+                int centerY = (int)particles.particles[i].position[1];
+                int radius = BALL_RADIUS;
 
-            for (int y = -radius; y <= radius; ++y) {
-                for (int x = -radius; x <= radius; ++x) {
-                    if (x*x + y*y <= radius*radius) {
-                        SDL_RenderDrawPoint(renderer, centerX + x, centerY + y);
+                for (int y = -radius; y <= radius; ++y) {
+                    for (int x = -radius; x <= radius; ++x) {
+                        if (x*x + y*y <= radius*radius) {
+                            SDL_RenderDrawPoint(renderer, centerX + x, centerY + y);
+                        }
                     }
                 }
             }
         }
 
 
+
         // Update particles if not paused
         if (!pause) {
-            update_particles(&particles, 1);
+            update_particles(&particles, 1, frames);
+        }
+
+        frames++;
+        if (SDL_GetTicks() - frame_start_time >= 5000) {
+            float elapsed_seconds = (SDL_GetTicks() - frame_start_time) / 1000.0;
+            float fps = frames / elapsed_seconds;
+            printf("FPS: %.2f\n", fps);
+            frame_start_time = SDL_GetTicks();
+            frames = 0;
         }
 
         // Delay and update display
